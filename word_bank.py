@@ -49,3 +49,12 @@ class WordBank:
     def random_clue(self, word):
         import random
         return random.choice(self.clues_by_word[word])
+
+    def shortest_clue(self, word, max_len=22):
+        """Hücreye sığması için en kısa ipucunu seçer (mümkünse max_len altında)."""
+        clues = self.clues_by_word[word]
+        clues_sorted = sorted(clues, key=len)
+        for c in clues_sorted:
+            if len(c) <= max_len:
+                return c
+        return clues_sorted[0]  # hiçbiri kısa değilse en kısasını yine de döndür

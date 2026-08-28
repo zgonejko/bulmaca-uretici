@@ -29,7 +29,7 @@ def puzzle_to_json(grid, slots, breaks, word_bank, rows=9, cols=7):
         if first_down:
             word = ''.join(grid[cc] for cc in first_down.cells())
             idx = cell_index[(0, c)]
-            cells[idx]['clue_text'] = word_bank.random_clue(word)
+            cells[idx]['clue_text'] = word_bank.shortest_clue(word)
 
     # Sol sütun (col0) ipuçları: her satırın İLK sağa-segmentinin çözülen
     # kelimesinden geliyor - aynı şekilde.
@@ -38,7 +38,7 @@ def puzzle_to_json(grid, slots, breaks, word_bank, rows=9, cols=7):
         if first_across:
             word = ''.join(grid[cc] for cc in first_across.cells())
             idx = cell_index[(r, 0)]
-            cells[idx]['clue_text'] = word_bank.random_clue(word)
+            cells[idx]['clue_text'] = word_bank.shortest_clue(word)
 
     # İç kısımdaki bölme/ipucu hücreleri - hangi yönde kaç ipucu olduğunu belirle
     for (r, c) in breaks:
@@ -48,12 +48,12 @@ def puzzle_to_json(grid, slots, breaks, word_bank, rows=9, cols=7):
         for s in slots:
             if s.direction == 'across' and s.start_row == r and s.start_col == c + 1:
                 word = ''.join(grid[cc] for cc in s.cells())
-                clue_texts.append({'direction': 'right', 'text': word_bank.random_clue(word)})
+                clue_texts.append({'direction': 'right', 'text': word_bank.shortest_clue(word)})
         # Bu hücreden aşağı doğru yeni bir kelime başlıyor mu?
         for s in slots:
             if s.direction == 'down' and s.start_col == c and s.start_row == r + 1:
                 word = ''.join(grid[cc] for cc in s.cells())
-                clue_texts.append({'direction': 'down', 'text': word_bank.random_clue(word)})
+                clue_texts.append({'direction': 'down', 'text': word_bank.shortest_clue(word)})
         cells[idx]['is_playable'] = False
         cells[idx]['clues'] = clue_texts
         cells[idx].pop('clue_text', None)

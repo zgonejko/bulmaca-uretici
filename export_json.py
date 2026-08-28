@@ -8,9 +8,6 @@ import uuid
 def puzzle_to_json(grid, slots, breaks, word_bank, rows=9, cols=7):
     cells = []
 
-    # Üst satır (ipucu, sabit) - şimdilik boş metin, gerçek üretimde
-    # kullanıcının kendi üst/sol ipucu havuzundan seçilecek.
-    # Bu örnek fonksiyon sadece İÇ KISMI (asıl üretilen bölüm) dolduruyor.
     for r in range(rows):
         for c in range(cols):
             if r == 0 and c == 0:
@@ -24,6 +21,24 @@ def puzzle_to_json(grid, slots, breaks, word_bank, rows=9, cols=7):
         idx = cell_index[(r, c)]
         cells[idx]['is_playable'] = True
         cells[idx]['solution_letter'] = letter
+
+    # Üst satır (row0) ipuçları: her sütunun İLK aşağı-segmentinin çözülen
+    # kelimesinden geliyor - ayrı bir kaynağa gerek yok, aynı mekanizma.
+    for c in range(1, cols):
+        first_down = next((s for s in slots if s.direction == 'down' and s.start_col == c and s.start_row == 1), None)
+        if first_down:
+            word = ''.join(grid[cc] for cc in first_down.cells())
+            idx = cell_index[(0, c)]
+            cells[idx]['clue_text'] = word_bank.random_clue(word)
+
+    # Sol sütun (col0) ipuçları: her satırın İLK sağa-segmentinin çözülen
+    # kelimesinden geliyor - aynı şekilde.
+    for r in range(1, rows):
+        first_across = next((s for s in slots if s.direction == 'across' and s.start_row == r and s.start_col == 1), None)
+        if first_across:
+            word = ''.join(grid[cc] for cc in first_across.cells())
+            idx = cell_index[(r, 0)]
+            cells[idx]['clue_text'] = word_bank.random_clue(word)
 
     # İç kısımdaki bölme/ipucu hücreleri - hangi yönde kaç ipucu olduğunu belirle
     for (r, c) in breaks:

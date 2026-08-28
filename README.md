@@ -52,9 +52,9 @@ python3 batch_test.py    # 30 bulmacalık toplu üretim testi çalıştırır
 
 ## Durum / Sıradaki adımlar
 
-- Kelime bankası: `Kitap_Kisa_Cevaplar_Basta_-_Kopya.xlsx` (8843 kelime + ipucu) — bu depoya
-  henüz eklenmedi, ayrıca yüklenmesi gerekiyor.
-- Nadir/az bilinen kelimeleri filtreleme (kalite iyileştirmesi) — henüz yapılmadı.
-- Üst satır/sol sütun ipuçlarının nereden geleceği (ayrı bir tema/kategori listesi mi,
-  yoksa aynı kelime bankasından mı seçileceği) netleşmedi.
-- Zorluk skoru ataması (`ai_difficulty`) henüz yok.
+- ~~Üst satır/sol sütun ipuçlarının nereden geleceği~~ → **çözüldü**: ayrı bir kaynağa
+  gerek yok, her sütun/satırın ilk segmentinin çözülen kelimesinden otomatik türetiliyor.
+- Nadir/az bilinen kelimeleri filtreleme — kullanıcı kendisi halledecek (kelime bankası tarafında).
+- Zorluk skoru ataması (`ai_difficulty`) henüz yok — Bölüm 8'deki gibi gerçek kullanıcı
+  verisiyle sonradan güncellenecek, üretim aşamasında boş bırakılıyor.
+- PHP/MySQL'e gerçek kayıt (şu an sadece JSON dosyasına yazıyor).

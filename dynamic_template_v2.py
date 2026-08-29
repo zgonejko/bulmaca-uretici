@@ -22,12 +22,18 @@ def generate_dynamic_slots_v2(rng, num_breaks_range=(4, 8)):
     all_breaks = set()
 
     target = rng.randint(*num_breaks_range)
-    candidates = [(r, c) for r in range(2, 9) for c in range(2, 7)]
+    candidates = [(r, c) for r in range(2, 9) for c in range(2, 7) if not (r == 8 and c == 6)]
     rng.shuffle(candidates)
 
     for (r, c) in candidates:
         if len(all_breaks) >= target:
             break
+        # İki bölme noktası bitişik olamaz (aralarında en az 1 harf hücresi kalmalı),
+        # yoksa biri diğerinin ipucu vereceği hücreyi de bölme yapıp boşa çıkarır.
+        if any((r, c + 1) in all_breaks or (r, c - 1) in all_breaks for _ in [0]):
+            continue
+        if any((r + 1, c) in all_breaks or (r - 1, c) in all_breaks for _ in [0]):
+            continue
         row_segs = _segment_lengths(sorted(row_breaks[r] | {c}), 6)
         col_segs = _segment_lengths(sorted(col_breaks[c] | {r}), 8)
         if all(e - s + 1 >= 2 for s, e in row_segs) and all(e - s + 1 >= 2 for s, e in col_segs):

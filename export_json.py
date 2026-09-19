@@ -5,7 +5,8 @@ import json
 import uuid
 
 
-def puzzle_to_json(grid, slots, breaks, word_bank, rows=9, cols=7):
+def puzzle_to_json(grid, slots, breaks, word_bank, rows=9, cols=7, image_assignments=None):
+    image_assignments = image_assignments or {}
     cells = []
 
     for r in range(rows):
@@ -24,12 +25,18 @@ def puzzle_to_json(grid, slots, breaks, word_bank, rows=9, cols=7):
 
     # Üst satır (row0) ipuçları: her sütunun İLK aşağı-segmentinin çözülen
     # kelimesinden geliyor - ayrı bir kaynağa gerek yok, aynı mekanizma.
+    # Görsel/bayrak atanmışsa metin yerine clue_image_url kullanılır.
     for c in range(1, cols):
         first_down = next((s for s in slots if s.direction == 'down' and s.start_col == c and s.start_row == 1), None)
         if first_down:
             word = ''.join(grid[cc] for cc in first_down.cells())
             idx = cell_index[(0, c)]
-            cells[idx]['clue_text'] = word_bank.shortest_clue(word)
+            assign = image_assignments.get((0, c))
+            if assign:
+                cells[idx]['clue_image_url'] = assign['url']
+                cells[idx]['is_flag'] = assign['type'] == 'flag'
+            else:
+                cells[idx]['clue_text'] = word_bank.shortest_clue(word)
 
     # Sol sütun (col0) ipuçları: her satırın İLK sağa-segmentinin çözülen
     # kelimesinden geliyor - aynı şekilde.
@@ -38,22 +45,38 @@ def puzzle_to_json(grid, slots, breaks, word_bank, rows=9, cols=7):
         if first_across:
             word = ''.join(grid[cc] for cc in first_across.cells())
             idx = cell_index[(r, 0)]
-            cells[idx]['clue_text'] = word_bank.shortest_clue(word)
+            assign = image_assignments.get((r, 0))
+            if assign:
+                cells[idx]['clue_image_url'] = assign['url']
+                cells[idx]['is_flag'] = assign['type'] == 'flag'
+            else:
+                cells[idx]['clue_text'] = word_bank.shortest_clue(word)
 
-    # İç kısımdaki bölme/ipucu hücreleri - hangi yönde kaç ipucu olduğunu belirle
+    # İç kısımdaki bölme/ipucu hücreleri - hangi yönde kaç ipucu olduğunu belirle.
+    # NOT: Bu hücrelerden yalnızca TEK yönlü olanlar (col6/row8 kenar
+    # kırılmaları) görsel/bayrak alabilir - çift sorulu (iç) hücrelere ASLA
+    # görsel atanmaz (image_assignments zaten sadece eligible_single_slots'tan
+    # doldurulduğu için buna gerek kalmadan doğru çalışıyor).
     for (r, c) in breaks:
         idx = cell_index[(r, c)]
         clue_texts = []
+        assign = image_assignments.get((r, c))
         # Bu hücreden sağa doğru yeni bir kelime başlıyor mu?
         for s in slots:
             if s.direction == 'across' and s.start_row == r and s.start_col == c + 1:
                 word = ''.join(grid[cc] for cc in s.cells())
-                clue_texts.append({'direction': 'right', 'text': word_bank.shortest_clue(word)})
+                if assign:
+                    clue_texts.append({'direction': 'right', 'text': None, 'image_url': assign['url'], 'is_flag': assign['type'] == 'flag'})
+                else:
+                    clue_texts.append({'direction': 'right', 'text': word_bank.shortest_clue(word)})
         # Bu hücreden aşağı doğru yeni bir kelime başlıyor mu?
         for s in slots:
             if s.direction == 'down' and s.start_col == c and s.start_row == r + 1:
                 word = ''.join(grid[cc] for cc in s.cells())
-                clue_texts.append({'direction': 'down', 'text': word_bank.shortest_clue(word)})
+                if assign:
+                    clue_texts.append({'direction': 'down', 'text': None, 'image_url': assign['url'], 'is_flag': assign['type'] == 'flag'})
+                else:
+                    clue_texts.append({'direction': 'down', 'text': word_bank.shortest_clue(word)})
         cells[idx]['is_playable'] = False
         cells[idx]['clues'] = clue_texts
         cells[idx].pop('clue_text', None)
@@ -90,20 +113,19 @@ if __name__ == '__main__':
     import sys, random
     sys.path.insert(0, '.')
     from word_bank import WordBank
-    from slot_filler import fill_grid
-    from dynamic_template_v2 import generate_dynamic_slots_v2
+    from puzzle_pipeline import generate_puzzle
 
-    wb = WordBank('/mnt/user-data/uploads/Kitap_Kisa_Cevaplar_Basta_-_Kopya.xlsx')
-    grid = None
+    wb = WordBank('Kitap_Kisa_Cevaplar_Basta_-_Kopya.xlsx')
+    result = None
     for _ in range(25):
         rng = random.Random()
-        slots, breaks, row_b, col_b = generate_dynamic_slots_v2(rng)
-        grid = fill_grid(slots, wb, max_tries_per_slot=50, max_backtracks=30000)
-        if grid:
+        result = generate_puzzle(wb, rng)
+        if result:
             break
 
-    puzzle_json = puzzle_to_json(grid, slots, breaks, wb)
-    with open('/home/claude/puzzle-generator/sample_puzzle.json', 'w', encoding='utf-8') as f:
+    slots, breaks, grid, image_assignments = result
+    puzzle_json = puzzle_to_json(grid, slots, breaks, wb, image_assignments=image_assignments)
+    with open('/tmp/test_puzzle.json', 'w', encoding='utf-8') as f:
         json.dump(puzzle_json, f, ensure_ascii=False, indent=2)
     print('sample_puzzle.json yazıldı')
-    print(f"Toplam hücre: {len(puzzle_json['cells'])}, harf akışı uzunluğu: {len(puzzle_json['letter_flow'])}")
+    print(f"Toplam hücre: {len(puzzle_json['cells'])}, görsel/bayrak hücre sayısı: {len(image_assignments)}")

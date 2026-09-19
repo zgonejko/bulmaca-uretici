@@ -50,7 +50,7 @@ def _find_anchor_slots(slots):
     return row1_slot, col1_slot
 
 
-def generate_puzzle(word_bank, rng, max_tries_per_slot=80, max_backtracks=300000, outer_retries=8,
+def generate_puzzle(word_bank, rng, max_tries_per_slot=80, max_backtracks=300000, outer_retries=40,
                      anchor_registry_path=None):
     """Başarılı olursa (slots, all_breaks, grid, image_assignments) döner.
     image_assignments: {(row,col): {'type': 'image'|'flag', 'url': str}} -

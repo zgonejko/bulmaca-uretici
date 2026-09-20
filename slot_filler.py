@@ -19,6 +19,32 @@ class Slot:
             return [(self.start_row + i, self.start_col) for i in range(self.length)]
 
 
+def _prefix_conflict(word, used_words):
+    """Aynı bulmacada anlamca/kökence çok benzer kelimelerin (örn. AKLANMA/
+    AKLANMAK, DESTAN/DESTANSI) birlikte kullanılmasını engeller. Kelimenin
+    uzunluğuna göre bir önek uzunluğu belirlenir (8->5, 7->4, 6->3, aşağı
+    doğru aynı oranda azalarak - 5 ve altı kelimelerde önek çok kısa/
+    anlamsız kalacağından kontrol devre dışı kalır).
+
+    Kontrol SİMETRİKTİR: iki kelimeden HANGİSİNİN eşiği (kendi uzunluğuna
+    göre) diğerinin aynı uzunluktaki önekiyle eşleşirse çakışma sayılır -
+    tek yönlü olsaydı, önce uzun sonra kısa bir kelime eklendiğinde (örn.
+    önce İRADE sonra İRİS) kısa kelimenin düşük eşiği devreye girip kontrolü
+    atlayabilirdi."""
+    def threshold(w):
+        n = len(w) - 3
+        return n if n >= 2 else None
+
+    n_word = threshold(word)
+    for w in used_words:
+        if n_word is not None and len(w) >= n_word and w[:n_word] == word[:n_word]:
+            return True
+        n_w = threshold(w)
+        if n_w is not None and len(word) >= n_w and word[:n_w] == w[:n_w]:
+            return True
+    return False
+
+
 def fill_grid(slots, word_bank, max_tries_per_slot=40, max_backtracks=20000,
               initial_grid=None, initial_used_words=None, preferred_words=None,
               anchor_slot_ids=None, used_anchor_pairs=None):
@@ -79,7 +105,7 @@ def fill_grid(slots, word_bank, max_tries_per_slot=40, max_backtracks=20000,
 
         constraints = constrained_positions(slot)
         candidates = word_bank.candidates(slot.length, constraints)
-        candidates = [w for w in candidates if w not in used_words]
+        candidates = [w for w in candidates if w not in used_words and not _prefix_conflict(w, used_words)]
         random.shuffle(candidates)
 
         # Bu slot için bir tercih (görsel/bayrak) belirtilmişse, ilgili
@@ -88,10 +114,12 @@ def fill_grid(slots, word_bank, max_tries_per_slot=40, max_backtracks=20000,
         # sorunsuzca devam edilsin.
         pref_type = preferred_words.get(slot.id)
         if pref_type == 'flag':
-            preferred_valid = [w for w in word_bank.flag_candidates(slot.length, constraints) if w not in used_words]
+            preferred_valid = [w for w in word_bank.flag_candidates(slot.length, constraints)
+                                if w not in used_words and not _prefix_conflict(w, used_words)]
             candidates = preferred_valid + [w for w in candidates if w not in preferred_valid]
         elif pref_type == 'image':
-            preferred_valid = [w for w in word_bank.image_candidates(slot.length, constraints) if w not in used_words]
+            preferred_valid = [w for w in word_bank.image_candidates(slot.length, constraints)
+                                if w not in used_words and not _prefix_conflict(w, used_words)]
             candidates = preferred_valid + [w for w in candidates if w not in preferred_valid]
 
         # Anchor çifti kısıtı: bu slot anchor'lardan biriyse VE diğeri zaten

@@ -23,6 +23,7 @@ from collections import defaultdict
 
 class WordBank:
     def __init__(self, xlsx_path):
+        self.xlsx_path = xlsx_path
         df = pd.read_excel(xlsx_path)
         # Sütun adları hem eski (Tanım / Soru, Cevap, Tip) hem yeni (soru,
         # cevap, tip - küçük harfli) biçimde gelebiliyor - ikisini de kabul et.

@@ -58,8 +58,9 @@ def generate_puzzle(word_bank, rng, max_tries_per_slot=80, max_backtracks=300000
 
     Anchor çifti (row1'in 6 harflisi + col1'in 8 harflisi) daha önce
     üretilmiş HİÇBİR bulmacada kullanılmamış olacak şekilde garanti edilir -
-    bkz. anchor_registry.py. Başarılı her üretimden sonra bu ikili kalıcı
-    kayda otomatik eklenir.
+    bkz. anchor_registry.py (kayıt, kelime bankasıyla aynı Excel dosyasının
+    'Uretilen_Bulmacalar' sayfasında tutulur). Başarılı her üretimden sonra
+    bu ikili kalıcı kayda otomatik eklenir.
 
     Görsel/bayrak sayısı 0 ile MAX_IMAGE_CELLS arasında olabilir - hedef en
     yüksek sayı ama TERCİH mekanizması gereği gerçek sayı kesişimlere bağlı
@@ -67,7 +68,8 @@ def generate_puzzle(word_bank, rng, max_tries_per_slot=80, max_backtracks=300000
 
     Tüm denemeler başarısız olursa None döner - çağıran taraf yeni bir rng
     ile (yeni bir şablonla) tekrar dener."""
-    used_anchors = load_used_anchors(anchor_registry_path) if anchor_registry_path else load_used_anchors()
+    anchor_path = anchor_registry_path or word_bank.xlsx_path
+    used_anchors = load_used_anchors(anchor_path)
 
     for _ in range(outer_retries):
         slots, all_breaks, row_b, col_b = generate_dynamic_slots_v2(rng)
@@ -113,7 +115,7 @@ def generate_puzzle(word_bank, rng, max_tries_per_slot=80, max_backtracks=300000
 
         row1_word = ''.join(grid[c] for c in row1_slot.cells())
         col1_word = ''.join(grid[c] for c in col1_slot.cells())
-        save_used_anchor(row1_word, col1_word, anchor_registry_path) if anchor_registry_path else save_used_anchor(row1_word, col1_word)
+        save_used_anchor(row1_word, col1_word, anchor_path)
 
         return slots, all_breaks, grid, image_assignments
 

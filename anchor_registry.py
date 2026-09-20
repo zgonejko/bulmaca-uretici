@@ -4,28 +4,44 @@ kalanını neredeyse tamamen belirlediği için, aynı ikilinin tekrar
 kullanılmasını engellemek, iki farklı çalıştırmada aynı/çok benzer bir
 bulmacanın üretilmesini büyük ölçüde önlüyor.
 
-Excel'e yeni kelime/görsel eklemeniz bu dosyayı ETKİLEMEZ - kayıt, siz
-elle silmediğiniz sürece kalıcı kalır, üretici dosyasını her çalıştırdığınızda
-üstüne eklenir.
+Kayıt, kelime bankasıyla AYNI Excel dosyasının ayrı bir SAYFASINDA
+("Uretilen_Bulmacalar") tutulur - JSON gibi ayrı bir dosya değil, tek bir
+yerde (Excel'de) her şeyi bir arada tutmak için. Excel'in kendisine yeni
+kelime/görsel eklemeniz bu sayfayı ETKİLEMEZ - siz elle silmediğiniz sürece
+kalıcı kalır, üretici dosyasını her çalıştırdığınızda üstüne eklenir.
 """
-import json
 import os
+import openpyxl
 
-DEFAULT_PATH = os.path.join(os.path.dirname(__file__), 'uretilmis_bulmacalar.json')
+SHEET_NAME = 'Uretilen_Bulmacalar'
 
 
-def load_used_anchors(path=DEFAULT_PATH):
-    if not os.path.exists(path):
+def load_used_anchors(xlsx_path):
+    if not os.path.exists(xlsx_path):
         return set()
-    with open(path, 'r', encoding='utf-8') as f:
-        data = json.load(f)
-    return {tuple(pair) for pair in data.get('anchors', [])}
+    wb = openpyxl.load_workbook(xlsx_path, read_only=True, data_only=True)
+    try:
+        if SHEET_NAME not in wb.sheetnames:
+            return set()
+        ws = wb[SHEET_NAME]
+        anchors = set()
+        for row in ws.iter_rows(min_row=2, max_col=2, values_only=True):
+            if row and row[0] and row[1]:
+                anchors.add((str(row[0]).strip().upper(), str(row[1]).strip().upper()))
+        return anchors
+    finally:
+        wb.close()
 
 
-def save_used_anchor(row1_word, col1_word, path=DEFAULT_PATH):
+def save_used_anchor(row1_word, col1_word, xlsx_path):
     """Yeni üretilen bir bulmacanın anchor çiftini kayda EKLER (mevcut
-    kayıtları silmez)."""
-    existing = load_used_anchors(path)
-    existing.add((row1_word, col1_word))
-    with open(path, 'w', encoding='utf-8') as f:
-        json.dump({'anchors': [list(p) for p in sorted(existing)]}, f, ensure_ascii=False, indent=2)
+    kayıtları ve Excel'deki diğer sayfaları etkilemez)."""
+    wb = openpyxl.load_workbook(xlsx_path)
+    if SHEET_NAME not in wb.sheetnames:
+        ws = wb.create_sheet(SHEET_NAME)
+        ws.append(['Row1_6Harfli', 'Col1_8Harfli'])
+    else:
+        ws = wb[SHEET_NAME]
+    ws.append([row1_word, col1_word])
+    wb.save(xlsx_path)
+    wb.close()

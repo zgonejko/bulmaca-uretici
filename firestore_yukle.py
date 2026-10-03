@@ -15,6 +15,9 @@ import json
 import os
 import random
 import sys
+import warnings
+
+warnings.filterwarnings('ignore')  # Python 3.8 eskidir uyarilarini gizle
 from datetime import datetime, timezone
 
 PROJECT_ID = 'kelimehane'
@@ -99,8 +102,10 @@ def main():
     try:
         from google.oauth2 import service_account
         from google.auth.transport.requests import AuthorizedSession
-    except ImportError:
-        hata('Once su komutu calistirin: pip install google-auth requests')
+    except Exception as e:  # asil hatayi goster
+        import traceback
+        traceback.print_exc()
+        hata('Paketler yuklenemedi. Asil hata: %r' % (e,))
 
     cred = service_account.Credentials.from_service_account_file(
         ANAHTAR, scopes=['https://www.googleapis.com/auth/datastore'])

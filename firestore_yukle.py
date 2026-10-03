@@ -10,6 +10,10 @@ Gerekenler:
 
 Daha once yuklenmis bulmacalar (ayni id) atlanir, yani ayni dosyayi iki kez
 calistirmak guvenlidir.
+
+Ayrica 'puzzlePool/main' dokumanindaki 'ids' listesine her bulmacanin id'si eklenir
+(listede zaten olan tekrar eklenmez, sira degismez). Uygulama gunluk bulmacayi bu
+listeden secer: listenin sirasi = bulmacalarin acilma sirasi.
 """
 import json
 import os
@@ -76,6 +80,19 @@ def dokuman_hazirla(p):
     return {'fields': {k: to_value(v) for k, v in veri.items()}}
 
 
+def havuz_body(ids):
+    """puzzlePool/main dokumanindaki ids listesine, olmayanlari sona ekleyen istek."""
+    ad = 'projects/%s/databases/(default)/documents/puzzlePool/main' % PROJECT_ID
+    return {'writes': [{
+        'update': {'name': ad, 'fields': {}},
+        'updateMask': {'fieldPaths': []},
+        'updateTransforms': [{
+            'fieldPath': 'ids',
+            'appendMissingElements': {'values': [{'stringValue': i} for i in ids]},
+        }],
+    }]}
+
+
 def hata(msg):
     print('HATA: ' + msg)
     sys.exit(1)
@@ -112,6 +129,7 @@ def main():
     oturum = AuthorizedSession(cred)
 
     yuklenen = atlanan = basarisiz = 0
+    havuz_idleri = []
     for i, p in enumerate(puzzles, 1):
         pid = p['id']
         # currentDocument.exists=false: dokuman zaten varsa 409 doner, uzerine yazmaz.
@@ -122,14 +140,24 @@ def main():
             timeout=60)
         if r.status_code == 200:
             yuklenen += 1
+            havuz_idleri.append(pid)
             print('%d/%d yuklendi' % (i, len(puzzles)))
         elif r.status_code == 409:
             atlanan += 1
+            havuz_idleri.append(pid)
             print('%d/%d zaten var, atlandi' % (i, len(puzzles)))
         else:
             basarisiz += 1
             print('%d/%d BASARISIZ (%s): %s' % (i, len(puzzles), r.status_code, r.text[:200]))
     print('Bitti. Yuklenen: %d, atlanan: %d, basarisiz: %d' % (yuklenen, atlanan, basarisiz))
+
+    if havuz_idleri:
+        r = oturum.post(BASE.replace('/documents', '/documents:commit'),
+                        json=havuz_body(havuz_idleri), timeout=60)
+        if r.status_code == 200:
+            print('Gunluk bulmaca listesi guncellendi (%d bulmaca listede).' % len(havuz_idleri))
+        else:
+            print('LISTE GUNCELLENEMEDI (%s): %s' % (r.status_code, r.text[:300]))
 
 
 if __name__ == '__main__':

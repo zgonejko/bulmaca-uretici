@@ -1,10 +1,8 @@
 """Gerçekçi (değişken uzunluklu, kesişen) bir şablonu gerçek kelime bankasıyla doldurma testi."""
-import sys
-sys.path.insert(0, '/home/claude/puzzle-generator')
-from word_bank import WordBank
+from word_bank import WordBank, DEFAULT_XLSX
 from slot_filler import Slot, fill_grid
 
-wb = WordBank('/mnt/user-data/uploads/Kitap_Kisa_Cevaplar_Basta_-_Kopya.xlsx')
+wb = WordBank(DEFAULT_XLSX)
 
 # Küçük, gerçekçi bir çengel bulmaca şablonu: kesişen, değişken uzunlukta kelimeler.
 # (row, col) 0-indexli. Izgara 8x8, birkaç kesişen slot.

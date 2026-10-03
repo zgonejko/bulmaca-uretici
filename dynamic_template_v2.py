@@ -16,8 +16,14 @@ DEĞİL, sabit bir kurala göre üretiliyor:
     kalır, en alt satıra (row8) denk gelenler sadece SAĞA yönlü kalır - bu,
     segment sınırları sayesinde kendiliğinden doğru çıkıyor, ayrı bir kod
     gerekmiyor (bkz. _segment_lengths).
+
+Tek harfli cevap YOKTUR: bir satır/sütunda tek harfe sığan parçalar kelime
+sayılmaz (bkz. _build_slots). Bu yüzden her ipucu hücresinden en az bir kelime
+başlamalı ve her harf hücresi en az bir kelimenin içinde olmalıdır
+(bkz. _layout_ok) - bu iki koşulu sağlamayan şablonlar atılıp yenisi üretilir.
 """
 from slot_filler import Slot
+from word_bank import TEK_HARFLI_CEVAP
 
 
 def _segment_lengths(breaks_sorted, total):
@@ -110,12 +116,60 @@ def _try_generate(rng):
     return None
 
 
-def generate_dynamic_slots_v2(rng, max_attempts=200):
-    result = None
+def _build_slots(row_breaks, col_breaks):
+    """Kırılma noktalarından slot listesini üretir.
+    TEK_HARFLI_CEVAP = True  : tek hücrelik parçalar da kendi (tek harfli) cevabı ve
+                               ipucuyla slot olur - hiçbir harfin ipucusuz kalmaz.
+    TEK_HARFLI_CEVAP = False : tek hücrelik parçalar kelime SAYILMAZ; o hücrenin harfi
+                               kesişen diğer cevaptan gelir, ipucu hücresi boş kalır."""
+    min_len = 1 if TEK_HARFLI_CEVAP else 2
+    slots = []
+    sid = 0
+    for r in range(1, 9):
+        for (s, e) in _segment_lengths(sorted(row_breaks[r]), 6):
+            if e - s + 1 < min_len:
+                continue
+            slots.append(Slot(f'A{sid}', 'across', r, s, e - s + 1)); sid += 1
+    for c in range(1, 7):
+        for (s, e) in _segment_lengths(sorted(col_breaks[c]), 8):
+            if e - s + 1 < min_len:
+                continue
+            slots.append(Slot(f'D{sid}', 'down', s, c, e - s + 1)); sid += 1
+    return slots
+
+
+def _layout_ok(slots, all_breaks):
+    """Tek harfli slotlar atıldıktan sonra ızgara hâlâ tutarlı mı?
+      1) Her ipucu (kırılma) hücresinden en az bir kelime başlamalı, yoksa
+         boş/anlamsız bir ipucu hücresi kalır.
+      2) Her harf hücresi en az bir kelimenin içinde olmalı, yoksa o harfin
+         hiçbir cevabı olmaz.
+    """
+    starts = {(s.direction, s.start_row, s.start_col) for s in slots}
+    for (r, c) in all_breaks:
+        if ('across', r, c + 1) not in starts and ('down', r + 1, c) not in starts:
+            return False
+    covered = set()
+    for s in slots:
+        covered.update(s.cells())
+    for r in range(1, 9):
+        for c in range(1, 7):
+            if (r, c) not in all_breaks and (r, c) not in covered:
+                return False
+    return True
+
+
+def generate_dynamic_slots_v2(rng, max_attempts=500):
+    slots = result = None
     for _ in range(max_attempts):
         result = _try_generate(rng)
-        if result is not None:
+        if result is None:
+            continue
+        row_breaks, col_breaks, all_breaks = result
+        slots = _build_slots(row_breaks, col_breaks)
+        if _layout_ok(slots, all_breaks):
             break
+        result = None
     if result is None:
         raise RuntimeError(
             'Kırılma noktaları kurala uygun şekilde yerleştirilemedi '
@@ -123,18 +177,4 @@ def generate_dynamic_slots_v2(rng, max_attempts=200):
             'olmalı, tekrar dene ya da ızgara/kural kısıtlarını gözden geçir.'
         )
     row_breaks, col_breaks, all_breaks = result
-
-    slots = []
-    sid = 0
-    for r in range(1, 9):
-        for (s, e) in _segment_lengths(sorted(row_breaks[r]), 6):
-            if s == 1 and e - s + 1 < 2:
-                continue  # sadece col1'in kendisi - ayrı doldurulacak bir kelime değil
-            slots.append(Slot(f'A{sid}', 'across', r, s, e - s + 1)); sid += 1
-    for c in range(1, 7):
-        for (s, e) in _segment_lengths(sorted(col_breaks[c]), 8):
-            if s == 1 and e - s + 1 < 2:
-                continue  # sadece row1'in kendisi - ayrı doldurulacak bir kelime değil
-            slots.append(Slot(f'D{sid}', 'down', s, c, e - s + 1)); sid += 1
-
     return slots, all_breaks, row_breaks, col_breaks

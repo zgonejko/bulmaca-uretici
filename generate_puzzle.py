@@ -1,10 +1,9 @@
-import sys, random
-sys.path.insert(0, '/home/claude/puzzle-generator')
-from word_bank import WordBank
+import random
+from word_bank import WordBank, DEFAULT_XLSX
 from slot_filler import fill_grid
 from dynamic_template import generate_dynamic_slots
 
-wb = WordBank('/mnt/user-data/uploads/Kitap_Kisa_Cevaplar_Basta_-_Kopya.xlsx')
+wb = WordBank(DEFAULT_XLSX)
 
 def generate_one_puzzle(max_template_tries=25):
     for attempt in range(max_template_tries):

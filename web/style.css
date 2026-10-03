@@ -1,0 +1,36 @@
+/* --o = olcek. 0.7 = %30 kucuk, 1 = ilk boyut, 0.5 = yari boyut. Sadece bu degeri degistirin. */
+:root { --o: 0.7; }
+
+body { font-family: Arial, Helvetica, sans-serif; background: #f2f4f1; color: #222; margin: 0; padding: 16px; }
+h1 { font-size: 20px; margin: 0 0 12px; }
+.ust-panel { background: #fff; border: 1px solid #cfd8cc; border-radius: 6px; padding: 12px 14px; margin-bottom: 16px; }
+.ust-panel label { margin-right: 14px; }
+.ust-panel input[type=number] { width: 56px; }
+.ust-panel button { padding: 6px 16px; font-size: 14px; cursor: pointer; }
+.bilgi { color: #555; font-size: 13px; margin-top: 8px; }
+.hata { background: #fde8e8; border: 1px solid #e0a0a0; color: #7a1d1d; padding: 10px 14px; border-radius: 6px; white-space: pre-wrap; margin-bottom: 16px; }
+.bulmaca { margin: 0 0 calc(28px * var(--o)); }
+.bulmaca h2 { font-size: calc(16px * var(--o) + 4px); margin: 0 0 6px; }
+.bulmaca h2 small { color: #777; font-weight: normal; margin-left: 8px; }
+
+table.izgara { border-collapse: collapse; table-layout: fixed; background: #fff; }
+table.izgara td { width: calc(84px * var(--o)); height: calc(78px * var(--o)); border: 1px solid #7fa97a; padding: 0; text-align: center; vertical-align: middle; position: relative; overflow: hidden; }
+td.bos { background: #fff; border-color: #fff; }
+td.ipucu { background: #d8ecd0; }
+td.bos-ipucu { background: #e9f3e4; }
+td.harf { background: #fff; }
+.cevap { font-size: calc(26px * var(--o)); font-weight: bold; }
+.gizle-cevap .cevap { visibility: hidden; }
+
+.tam, .bolunmus { width: 100%; height: calc(78px * var(--o)); position: relative; }
+.yarim { height: calc(38px * var(--o)); position: relative; overflow: hidden; }
+.yarim.ust { border-bottom: 1px solid #7fa97a; }
+.tam, .yarim { display: table; width: 100%; }
+.metin { display: table-cell; vertical-align: middle; font-size: calc(10.5px * var(--o)); font-weight: bold; line-height: 1.15; padding: 1px calc(8px * var(--o)) 1px calc(3px * var(--o)); text-transform: uppercase; word-wrap: break-word; }
+.tam .metin { font-size: calc(11.5px * var(--o)); }
+img.gorsel, img.bayrak { max-width: calc(66px * var(--o)); max-height: calc(62px * var(--o)); margin: calc(6px * var(--o)) auto; display: block; }
+.yarim img { max-height: calc(32px * var(--o)); margin: calc(3px * var(--o)) auto; }
+
+/* Oklar: saga (kenarda ortada) ve asagi (altta ortada) */
+.ok-sag:after { content: ""; position: absolute; right: 0; top: 50%; margin-top: calc(-5px * var(--o)); border-left: calc(7px * var(--o)) solid #111; border-top: calc(5px * var(--o)) solid transparent; border-bottom: calc(5px * var(--o)) solid transparent; }
+.ok-asagi:before { content: ""; position: absolute; left: 50%; bottom: 0; margin-left: calc(-5px * var(--o)); border-top: calc(7px * var(--o)) solid #111; border-left: calc(5px * var(--o)) solid transparent; border-right: calc(5px * var(--o)) solid transparent; }

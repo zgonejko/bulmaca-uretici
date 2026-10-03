@@ -110,12 +110,11 @@ def puzzle_to_json(grid, slots, breaks, word_bank, rows=9, cols=7, image_assignm
 
 
 if __name__ == '__main__':
-    import sys, random
-    sys.path.insert(0, '.')
-    from word_bank import WordBank
+    import os, random
+    from word_bank import WordBank, DEFAULT_XLSX
     from puzzle_pipeline import generate_puzzle
 
-    wb = WordBank('Kitap_Kisa_Cevaplar_Basta_-_Kopya.xlsx')
+    wb = WordBank(DEFAULT_XLSX)
     result = None
     for _ in range(25):
         rng = random.Random()
@@ -125,7 +124,8 @@ if __name__ == '__main__':
 
     slots, breaks, grid, image_assignments = result
     puzzle_json = puzzle_to_json(grid, slots, breaks, wb, image_assignments=image_assignments)
-    with open('/tmp/test_puzzle.json', 'w', encoding='utf-8') as f:
+    out_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'sample_puzzle.json')
+    with open(out_path, 'w', encoding='utf-8') as f:
         json.dump(puzzle_json, f, ensure_ascii=False, indent=2)
-    print('sample_puzzle.json yazıldı')
+    print(f'{out_path} yazıldı')
     print(f"Toplam hücre: {len(puzzle_json['cells'])}, görsel/bayrak hücre sayısı: {len(image_assignments)}")

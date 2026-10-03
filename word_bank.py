@@ -16,13 +16,21 @@ NOT: Görsel ipucusu eklediğiniz bir kelimenin YANINDA en az bir metin
 ipucusu (Tip=1) da bulundurmanız güvenlidir - metin karşılığı olmayan bir
 kelime iç (çift sorulu) bir hücreye denk gelirse ipucu bulunamaz.
 """
+import os
+import random
 import pandas as pd
-import re
 from collections import defaultdict
+
+# Kelime bankası varsayılan olarak bu dosyanın yanındaki bulmaca.xlsx'tir.
+DEFAULT_XLSX = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'bulmaca.xlsx')
+
+# True: tek harfli cevaplar (A, K, M, Y... ) kullanilir; satir/sutunda tek hucre kalan yerlerin
+# de kendi ipucu olur (bankada tek harfli cevap olmali). False: tek harfli cevap yok, o ipucu hucreleri bos kalir.
+TEK_HARFLI_CEVAP = True
 
 
 class WordBank:
-    def __init__(self, xlsx_path):
+    def __init__(self, xlsx_path=DEFAULT_XLSX):
         self.xlsx_path = xlsx_path
         df = pd.read_excel(xlsx_path)
         # Sütun adları hem eski (Tanım / Soru, Cevap, Tip) hem yeni (soru,
@@ -39,7 +47,10 @@ class WordBank:
             df = df.rename(columns=rename_map)
 
         df = df.dropna(subset=['Cevap', 'Tanım / Soru'])
-        df['Cevap'] = df['Cevap'].astype(str).str.strip().str.upper()
+        # Türkçe büyük harf: i -> İ, ı -> I (Python'un upper()'ı i'yi I yapar, bu yüzden küçük harfle
+        # yazılmış cevaplar - örn. görsel satırları 'aplik' - yanlış harfli çıkardı ve metin ipucu satırlarıyla eşleşmezdi).
+        df['Cevap'] = (df['Cevap'].astype(str).str.strip()
+                       .str.replace('i', 'İ', regex=False).str.replace('ı', 'I', regex=False).str.upper())
         df['Tanım / Soru'] = df['Tanım / Soru'].astype(str).str.strip()
         if 'Tip' in df.columns:
             df['Tip'] = pd.to_numeric(df['Tip'], errors='coerce').fillna(1).astype(int)
@@ -47,11 +58,19 @@ class WordBank:
             df['Tip'] = 1
         # Sadece Türkçe harflerden oluşan, tek kelimelik cevapları al.
         df = df[df['Cevap'].str.match(r'^[A-ZÇĞİÖŞÜ]+$', na=False)]
+        if not TEK_HARFLI_CEVAP:
+            df = df[df['Cevap'].str.len() >= 2]
 
         # word -> [{'value': metin_veya_url, 'tip': 1|2|3}, ...]
+        # Tip 2 (görsel) ve tip 3 (eski bayrak tipi) AYNI şeydir: görsel ipucu. Görselin BAYRAK olup
+        # olmadığı adresinden anlaşılır ('/flags/' klasörü) - Excel'de bayraklar da tip 2 yazılabilir.
         self.clues_by_word = defaultdict(list)
         for _, row in df.iterrows():
-            self.clues_by_word[row['Cevap']].append({'value': row['Tanım / Soru'], 'tip': int(row['Tip'])})
+            tip = int(row['Tip'])
+            clue = {'value': row['Tanım / Soru'], 'tip': 2 if tip == 3 else tip}
+            if clue['tip'] == 2:
+                clue['is_flag'] = tip == 3 or '/flags/' in str(row['Tanım / Soru']).lower()
+            self.clues_by_word[row['Cevap']].append(clue)
 
         # Genel doldurma havuzu: SADECE en az 1 metin (tip=1) ipucusu olan
         # kelimeler - bayrak-only ve (varsa) görsel-only kelimeler bu havuzda
@@ -61,14 +80,16 @@ class WordBank:
         for w in text_words:
             self.words_by_len[len(w)].append(w)
 
-        # Sadece bayrak (tip=3) kelimeler - özel bayrak yerleştirme adımı için ayrı havuz.
-        flag_words = {w for w, clues in self.clues_by_word.items() if any(c['tip'] == 3 for c in clues)}
+        # Bayrak görselli kelimeler (adresi /flags/ içeren görseller) - bayrak yerleştirme adımı için ayrı havuz.
+        flag_words = {w for w, clues in self.clues_by_word.items()
+                      if any(c['tip'] == 2 and c.get('is_flag') for c in clues)}
         self.flag_words_by_len = defaultdict(list)
         for w in flag_words:
             self.flag_words_by_len[len(w)].append(w)
 
-        # Görsel (tip=2) ipucusu olan kelimeler - aktif görsel yerleştirme adımı için ayrı havuz.
-        image_words = {w for w, clues in self.clues_by_word.items() if any(c['tip'] == 2 for c in clues)}
+        # Bayrak OLMAYAN görsel ipuçlu kelimeler - görsel yerleştirme adımı için ayrı havuz.
+        image_words = {w for w, clues in self.clues_by_word.items()
+                       if any(c['tip'] == 2 and not c.get('is_flag') for c in clues)}
         self.image_words_by_len = defaultdict(list)
         for w in image_words:
             self.image_words_by_len[len(w)].append(w)
@@ -76,6 +97,7 @@ class WordBank:
         # Bayrak/görsel kelimeler için de (length, pos, letter) indeksi - bunlar
         # genel havuzda OLMAYABİLİR (özellikle bayraklar hiç yok), o yüzden
         # kesişim-uyumlu aday ararken ayrı bir indekse ihtiyaç var.
+        self._set_cache = {}
         self._flag_pos_letter = self._build_pos_letter_index(flag_words)
         self._image_pos_letter = self._build_pos_letter_index(image_words)
 
@@ -109,6 +131,42 @@ class WordBank:
                 return []
         return list(result)
 
+    def _candidate_set_from(self, pool_by_len, pos_letter_index, length, constraints):
+        """_candidates_from'un KÜME döndüren hızlı hali. Kümeler bir kez hesaplanıp önbelleğe alınır;
+        kesişimler (&) ve çıkarmalar (-) Python döngüsü yerine C hızında yapılır. DÖNEN KÜMEYİ DEĞİŞTİRMEYİN."""
+        cache = self._set_cache.setdefault(id(pool_by_len), {})
+        if not constraints:
+            key = ('all', length)
+            r = cache.get(key)
+            if r is None:
+                r = cache[key] = frozenset(pool_by_len.get(length, ()))
+            return r
+        sets = []
+        for pos, letter in constraints.items():
+            k = (length, pos, letter)
+            r = cache.get(k)
+            if r is None:
+                r = cache[k] = frozenset(pos_letter_index.get(k, ()))
+            if not r:
+                return frozenset()
+            sets.append(r)
+        sets.sort(key=len)
+        result = sets[0]
+        for other in sets[1:]:
+            result = result & other
+            if not result:
+                return frozenset()
+        return result
+
+    def candidate_set(self, length, constraints):
+        return self._candidate_set_from(self.words_by_len, self.by_len_pos_letter, length, constraints)
+
+    def flag_candidate_set(self, length, constraints):
+        return self._candidate_set_from(self.flag_words_by_len, self._flag_pos_letter, length, constraints)
+
+    def image_candidate_set(self, length, constraints):
+        return self._candidate_set_from(self.image_words_by_len, self._image_pos_letter, length, constraints)
+
     def candidates(self, length, constraints):
         """constraints: {pozisyon: harf} - o pozisyonlarda belirli harf isteyen kelimeleri döndürür."""
         return self._candidates_from(self.words_by_len, self.by_len_pos_letter, length, constraints)
@@ -122,30 +180,31 @@ class WordBank:
         return self._candidates_from(self.image_words_by_len, self._image_pos_letter, length, constraints)
 
     def random_clue(self, word):
-        import random
         texts = [c['value'] for c in self.clues_by_word[word] if c['tip'] == 1]
         return random.choice(texts) if texts else None
 
     def shortest_clue(self, word, max_len=22):
-        """Hücreye sığması için en kısa METİN ipucusunu seçer (görsel/bayrak asla dönmez)."""
-        texts = sorted((c['value'] for c in self.clues_by_word[word] if c['tip'] == 1), key=len)
+        """Hücreye sığan (max_len karakter veya daha kısa) METİN ipuçları arasından
+        RASTGELE birini seçer; hiçbiri sığmıyorsa en kısasını döner. (Görsel/bayrak
+        asla dönmez.) Böylece aynı kelime farklı bulmacalarda farklı ipuçlarıyla gelir."""
+        texts = [c['value'] for c in self.clues_by_word[word] if c['tip'] == 1]
         if not texts:
             return None
-        for t in texts:
-            if len(t) <= max_len:
-                return t
-        return texts[0]
+        fitting = [t for t in texts if len(t) <= max_len]
+        if fitting:
+            return random.choice(fitting)
+        return min(texts, key=len)
 
     def image_clue(self, word):
         """Bu kelimenin bir görsel (tip=2) ipucusu varsa URL'sini döner, yoksa None."""
         for c in self.clues_by_word[word]:
-            if c['tip'] == 2:
+            if c['tip'] == 2 and not c.get('is_flag'):
                 return c['value']
         return None
 
     def flag_clue(self, word):
-        """Bu kelimenin bir bayrak (tip=3) ipucusu varsa URL'sini döner, yoksa None."""
+        """Bu kelimenin bir bayrak görseli varsa URL'sini döner, yoksa None."""
         for c in self.clues_by_word[word]:
-            if c['tip'] == 3:
+            if c['tip'] == 2 and c.get('is_flag'):
                 return c['value']
         return None

@@ -2,3 +2,6 @@ __pycache__/
 *.pyc
 sample_puzzle.json
 .venv/
+bulmaca.xlsx
+servis-anahtari.json
+web/config.php

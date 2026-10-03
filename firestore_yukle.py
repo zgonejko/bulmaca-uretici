@@ -22,10 +22,11 @@ import sys
 import warnings
 
 warnings.filterwarnings('ignore')  # Python 3.8 eskidir uyarilarini gizle
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 PROJECT_ID = 'kelimehane'
 KOLEKSIYON = 'puzzles'
+GUNLUK_BASLANGIC = date(2026, 9, 28)  # uygulamadaki gunluk bulmaca sirasinin basladigi gun (uygulamadakiyle ayni olmali)
 ANAHTAR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'servis-anahtari.json')
 BASE = 'https://firestore.googleapis.com/v1/projects/%s/databases/(default)/documents' % PROJECT_ID
 
@@ -155,7 +156,15 @@ def main():
         r = oturum.post(BASE.replace('/documents', '/documents:commit'),
                         json=havuz_body(havuz_idleri), timeout=60)
         if r.status_code == 200:
-            print('Gunluk bulmaca listesi guncellendi (%d bulmaca listede).' % len(havuz_idleri))
+            print('Gunluk bulmaca listesi guncellendi.')
+            g = oturum.get('%s/puzzlePool/main' % BASE, timeout=60)
+            if g.status_code == 200:
+                adet = len(g.json().get('fields', {}).get('ids', {}).get('arrayValue', {}).get('values', []))
+                son = GUNLUK_BASLANGIC + timedelta(days=adet - 1)
+                kalan = (son - date.today()).days + 1
+                print('Listede toplam %d bulmaca var. Gunluk bulmacalar %s tarihine kadar yeter (%d gun kaldi).' % (adet, son.strftime('%d.%m.%Y'), kalan))
+                if kalan < 30:
+                    print('UYARI: 30 günden az kaldi, yeni bulmaca uretip yukleyin!')
         else:
             print('LISTE GUNCELLENEMEDI (%s): %s' % (r.status_code, r.text[:300]))
 
